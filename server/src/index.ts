@@ -1,12 +1,15 @@
-import express from "express"; 
-import { config } from "./config";
+import express from "express";
+import dotenv from 'dotenv';
 import { createServer } from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import { randomUUID } from "crypto";
-import jwt from "jsonwebtoken"; // Import JWT
+import jwt from "jsonwebtoken";
+import Filter from "bad-words";
+import { config } from "./config";
 import { Message, User } from "./interfaces";
- 
+
+dotenv.config();
 
 const app = express();
 app.use(cors());
@@ -19,29 +22,48 @@ const io = new Server(httpServer, {
     }
 });
 
-// SECRET KEY: In production, put this in .env
-const SECRET_KEY = config.jwtSecret
+const SECRET_KEY = config.jwtSecret;
 
-// Active sessions (Only for the User List/Sidebar)
+const filter = new Filter();
+filter.addWords("sex", "nude", "naked", "horny", "xxx");
+
 const sessions = new Map<string, User>();
 const messages: Message[] = [];
 
-// MIDDLEWARE: Verify the Token
-io.use((socket, next) => {
-    const token = socket.handshake.auth.token;
+const bannedDevices = new Set<string>();
+const bannedIPs = new Set<string>();
+const ipViolationCounts = new Map<string, number>();
 
+const getClientIp = (socket: any) => {
+    // Check headers for proxies (like Nginx/Cloudflare) or fallback to direct connection
+    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
+    // Handle localhost IPv6 format (::1) or mapped IPv4 (::ffff:127.0.0.1)
+    return ip === '::1' ? '127.0.0.1' : ip;
+};
+
+// middleware definition
+io.use((socket, next) => {
+
+    // checking for if this ip has been banned before or not
+    const ip = getClientIp(socket);
+    if (bannedIPs.has(ip)) {
+        console.log(`Blocked connection from banned IP: ${ip}`);
+        return next(new Error("You are banned from this server."));
+    }
+
+    const token = socket.handshake.auth.token;
     if (token) {
         try {
-            // VERIFY: Check if the token was signed by us
             const decoded = jwt.verify(token, SECRET_KEY) as User;
-            
 
-            // If valid, attach data to socket
+            if (bannedDevices.has(decoded.deviceId)) {
+                return next(new Error("This device is banned."));
+            }
+
+
             socket.data.user = decoded;
             return next();
         } catch (err) {
-            // Token is invalid or expired
-            console.log("Invalid token");
             return next();
         }
     }
@@ -49,48 +71,70 @@ io.use((socket, next) => {
 });
 
 io.on("connection", (socket) => {
-    // RECONNECTION LOGIC
-    // If middleware found a valid token, socket.data.user exists
+    const ip = getClientIp(socket);
+
+    // Reconnection logic
     if (socket.data.user) {
         const user = socket.data.user;
 
-        // Add them back to the active list (in case server restarted)
-        // We update the socketId to the new connection
+        // Check if this user is banned before allowing restore
+        if (bannedDevices.has(user.deviceId) || bannedIPs.has(ip)) {
+            console.log(`Banned user tried to reconnect: ${user.username}`);
+            socket.emit("banned", "You are permanently banned from this server.");
+            socket.disconnect(true);
+            return;
+        }
+
         const updatedUser = { ...user, socketId: socket.id };
         sessions.set(user.id, updatedUser);
 
-        console.log(`User restored via Token: ${user.username}`);
-
-        // Send them the state
         socket.emit("sessionRestored", {
-            sessionID: user.id, // ID from the token
+            sessionID: user.id,
             username: user.username,
             messages: messages,
             users: Array.from(sessions.values())
         });
-
-        // Tell everyone else they are online
         io.emit("userList", Array.from(sessions.values()));
     }
 
-    // --- NEW LOGIN ---
-
-    const deviceId = socket.handshake.auth.deviceId;
+    // --- EVENTS ---
 
     socket.on("join", (username: string) => {
-        const userId = randomUUID();
+        // gettiing the device id from handshaking..
+        const deviceId = socket.handshake.auth.deviceId;
+        const currentIp = getClientIp(socket);
 
+        //  CHECK IF BANNED
+        if (deviceId && bannedDevices.has(deviceId) || bannedIPs.has(currentIp)) {
+            console.log(`Rejected join request from banned device: ${deviceId}`);
+            socket.emit("banned", "This device is permanently banned.");
+            socket.disconnect(true);
+            return;
+        }
+
+        for (const [existingUserId, existingUser] of sessions.entries()) {
+            if (existingUser.deviceId === deviceId) {
+                console.log(`Removing stale session for ${existingUser.username}`);
+                sessions.delete(existingUserId);
+                // In case we  want to force disconnect the OLD socket (if it's still open)
+                // io.sockets.sockets.get(existingUser.socketId)?.disconnect(true);
+            }
+        }
+
+        const userId = randomUUID();
         const newUser: User = {
             id: userId,
             username: username,
             socketId: socket.id,
-            deviceId: deviceId // <--- STORE IT
+            deviceId: deviceId
         };
+
+        // Attach user to socket for easier access later
+        socket.data.user = newUser;
 
         const token = jwt.sign(newUser, SECRET_KEY);
         sessions.set(userId, newUser);
 
-        // (No changes needed to the emits, just saving the user correctly)
         socket.emit("sessionCreated", {
             token: token,
             userId: userId,
@@ -103,29 +147,89 @@ io.on("connection", (socket) => {
         io.emit("userJoined", username);
     });
 
-    // UPDATE SEND MESSAGE LOGIC
     socket.on("sendMessage", (message: string) => {
+        // Retrieve User
         const user = socket.data.user || sessions.get(Array.from(sessions.entries()).find(([, u]) => u.socketId === socket.id)?.[0] || "");
+        const currentIp = getClientIp(socket);
 
         if (user) {
+            if (filter.isProfane(message)) {
+
+                // 1. Increment Violation Count
+                const currentCount = (ipViolationCounts.get(currentIp) || 0) + 1;
+                ipViolationCounts.set(currentIp, currentCount);
+
+                console.log(`Profanity detected. User: ${user.username}, IP: ${currentIp}, Count: ${currentCount}`);
+
+                // 2. CHECK THRESHOLDS
+
+                // --- LEVEL 3: IP BAN (6th Attempt) ---
+                if (currentCount >= 6) {
+                    bannedIPs.add(currentIp); // Ban the Network
+
+                    // Ban device too just to be sure
+                    if (user.deviceId) bannedDevices.add(user.deviceId);
+
+                    cleanupUser(user);
+                    socket.emit("banned", "IP BANNED: You ignored the final warning.");
+                    socket.disconnect(true);
+                    return;
+                }
+
+                // --- LEVEL 2: FINAL WARNING (5th Attempt) ---
+                if (currentCount === 5) {
+                    // Send a special "warning" event, NOT a ban
+                    socket.emit("warning", "CRITICAL WARNING: You have violated our policy 5 times. ONE more violation will result in a permanent IP BAN.");
+                    return; // Do not send the message, but don't disconnect yet
+                }
+
+                // --- LEVEL 1: DEVICE BAN (3rd Attempt) ---
+                if (currentCount === 3) {
+                    if (user.deviceId) bannedDevices.add(user.deviceId); // Ban this specific browser
+
+                    cleanupUser(user);
+                    socket.emit("banned", "DEVICE BANNED: You violated the policy 3 times. You are removed.");
+                    socket.disconnect(true);
+                    return;
+                }
+
+                // --- LEVEL 0: MILD WARNING (1st & 2nd, 4th Attempt) ---
+                const attemptsLeft = currentCount < 3 ? (3 - currentCount) : (6 - currentCount);
+                const target = currentCount < 3 ? "Device Ban" : "IP Ban";
+
+                socket.emit("warning", `Profanity detected! That message was blocked. ${attemptsLeft} more strikes until ${target}.`);
+                return; // Stop execution
+            }
+
+            // Normal Message Logic
             const msg: Message = {
                 user: {
                     id: user.id,
                     username: user.username,
                     socketId: socket.id,
-                    deviceId: user.deviceId // Include in nested user object if needed
+                    deviceId: user.deviceId
                 },
                 message,
                 timestamp: new Date(),
-                deviceId: user.deviceId // <--- STAMP THE MESSAGE
+                deviceId: user.deviceId
             };
             messages.push(msg);
             io.emit("newMessage", msg);
         }
     });
 
+    const cleanupUser = (user: User) => {
+        sessions.delete(user.id);
+        // Purge history
+        for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].user.id === user.id) messages.splice(i, 1);
+        }
+        io.emit("messageHistory", messages);
+        io.emit("userList", Array.from(sessions.values()));
+        io.emit("userLeft", user.username);
+    };
+
     socket.on("userLeft", (username) => {
-        // Manual Logout
         if (socket.data.user) {
             sessions.delete(socket.data.user.id);
             io.emit("userList", Array.from(sessions.values()));
@@ -134,20 +238,14 @@ io.on("connection", (socket) => {
     });
 
     socket.on("disconnect", () => {
-        // For the user list, we remove them from RAM so they don't appear "Online"
-        // BUT we don't invalidate their token. If they come back, the token works.
         if (socket.data.user) {
-            // Optional: You might want to keep them in the list for a bit (debounce), 
-            // but strictly speaking for "Online Users", they are offline now.
             sessions.delete(socket.data.user.id);
             io.emit("userList", Array.from(sessions.values()));
-            // We don't need to emit 'userLeft' if we want them to stay "ghosted", 
-            // but usually you want to show they disconnected.
         }
     });
 });
 
-const PORT = config.port
+const PORT = config.port;
 httpServer.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });

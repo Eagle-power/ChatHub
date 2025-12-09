@@ -8,6 +8,7 @@ export interface User {
 
 export interface LoginProps{
     onLogin : (username : string ) => void
+    onShowTerms: () => void;
 }
 
 export interface  ChatProps {

@@ -3,11 +3,14 @@ import type { User, Message } from "./interfaces";
 import { socket, updateDeviceActivity, getDeviceId } from "./services/socket"; // Added getDeviceId import
 import Login from "./components/Login";
 import Chat from "./components/chat";
+import Terms from "./components/TermAndCondition";
 
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [initialMessages, setInitialMessages] = useState<Message[]>([]);
   const [initialUsers, setInitialUsers] = useState<User[]>([]);
+
+  const [viewingTerms, setViewingTerms] = useState(false);
 
   // 1. DEVICE ACTIVITY TIMER LOGIC
   useEffect(() => {
@@ -69,12 +72,43 @@ function App() {
       });
     };
 
+    const onBanned = (reason: string) => {
+      alert(reason); // Show popup: "You have been banned..."
+
+      // Clear Local Data
+      sessionStorage.removeItem("chat_token");
+
+      // Reset State
+      setCurrentUser(null);
+      setInitialMessages([]);
+      setInitialUsers([]);
+    };
+    const onWarning = (message: string) => {
+      alert(message);
+    };
+
+
+    const onConnectError = (err: Error) => {
+        // This catches the "You are banned" error from the server middleware
+        if (err.message.includes("banned")) {
+            alert(err.message); // Show: "You are banned from this server"
+            sessionStorage.removeItem("chat_token"); // Clear token so they don't loop
+        }
+        console.log("Connection failed:", err.message);
+    };
+
     socket.on("sessionCreated", onSessionCreated);
     socket.on("sessionRestored", onSessionRestored);
+    socket.on("banned", onBanned);
+    socket.on("warning", onWarning);
+    socket.on("connect_error", onConnectError);
 
     return () => {
       socket.off("sessionCreated", onSessionCreated);
       socket.off("sessionRestored", onSessionRestored);
+      socket.off("banned" , onBanned);
+      socket.off("warning", onWarning);
+      socket.off("connect_error", onConnectError);
     };
   }, []);
 
@@ -96,10 +130,15 @@ function App() {
     setInitialUsers([]);
   };
 
+  if (viewingTerms) {
+    return <Terms onBack={() => setViewingTerms(false)} />;
+  }
+
+
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {!currentUser ? (
-        <Login onLogin={handleLogin} />
+        <Login onLogin={handleLogin} onShowTerms={() => setViewingTerms(true)} />
       ) : (
         <Chat
           currentUser={currentUser}

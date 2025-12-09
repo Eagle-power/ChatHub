@@ -4,7 +4,7 @@ import { GetUserIcon } from "../../Helpers";
 import { FiLogOut } from "react-icons/fi";
 import { BsCircleFill } from "react-icons/bs";
 
-const Header = ({ currentUser, users, onLogout }: HeaderProps) => {
+const Header = ({ currentUser , users, onLogout  }: HeaderProps) => {
   return (
     <header className="bg-white border-b border-gray-200 shadow-sm">
       <div className="px-4 py-3">
@@ -15,7 +15,7 @@ const Header = ({ currentUser, users, onLogout }: HeaderProps) => {
               <RiMessage2Fill className="h-5 w-5 text-white" />
             </div>
             <h1 className="text-xl font-semibold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
-              TeamSpace
+              ChatHub
             </h1>
           </div>
 
@@ -34,8 +34,8 @@ const Header = ({ currentUser, users, onLogout }: HeaderProps) => {
               </span>
             </div>
 
-            <button
-              onClick={() => onLogout(currentUser?.username)}
+            <button 
+              onClick={() => currentUser && onLogout(currentUser?.username)}
               className="p-2 text-gray-400 hover:text-gray-700 rounded-full 
                         hover:bg-gray-200 transition-all cursor-pointer"
             >

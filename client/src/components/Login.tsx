@@ -4,18 +4,18 @@ import type { LoginProps } from "../interfaces";
 
 
 
-const Login = ({onLogin} : LoginProps) => {
-    const [username , setUserName] = useState("");
+const Login = ({ onLogin, onShowTerms }: LoginProps) => {
+    const [username, setUserName] = useState("");
 
-    const handleSubmit = (e : React.FormEvent) =>{
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if(username.trim()){
+        if (username.trim()) {
             onLogin(username)
         }
     }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-50 p-4">
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-50 p-4">
             <div className="w-full max-w-md bg-white rounded-2xl shadow-xl  shadow-black/5 overflow-hidden">
 
                 {/* Left side gradient section */}
@@ -26,9 +26,9 @@ const Login = ({onLogin} : LoginProps) => {
 
                 <div className="px-8 py-12">
                     {/* Header */}
-                    
+
                     <div className="text-center  mb-8">
-                        <h1 className="text-2xl font-bold  text-slate-800">Welcome to TeamSpace</h1>
+                        <h1 className="text-2xl font-bold  text-slate-800">Welcome to ChatHub</h1>
                         <p className="mt-2 text-slate-600">Join the conversation</p>
                     </div>
 
@@ -38,13 +38,13 @@ const Login = ({onLogin} : LoginProps) => {
                         <div className="space-y-2">
                             <label htmlFor="username" className="block text-sm font-medium text-slate-700">Choose a username</label>
                             <div className="relative">
-                                <input type="text" id="username" placeholder="Enter your username"  
-                                        value={username}
-                                        onChange={(e)=> setUserName(e.target.value)}
-                                        className="w-full px-4 py-3  bg-slate-50 border border-slate-200 
+                                <input type="text" id="username" placeholder="Enter your username"
+                                    value={username}
+                                    onChange={(e) => setUserName(e.target.value)}
+                                    className="w-full px-4 py-3  bg-slate-50 border border-slate-200 
                                         rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 
                                         focus:border-blue:500 transition-all duration-200 
-                                        placeholder:text-slate-400" required 
+                                        placeholder:text-slate-400" required
                                 />
                                 {
                                     username && <div className="absolute right-10 top-1/2 -translate-y-1/2">
@@ -61,16 +61,25 @@ const Login = ({onLogin} : LoginProps) => {
 
                     {/* Footer */}
 
-                    <div className="mt-8 pt-6 border-t border-slate-250">
-                        <p className="text-center text-sm text-slate-500">By joining, You agree to our  
-                            <a href="#" className="text-blue-500 hover:text-blue-600"> terms &  conditions</a>
+                    <div className="mt-8 pt-6 border-t border-slate-200">
+                        <p className="text-center text-sm text-slate-500">
+                            By joining, You agree to our{" "}
+                            <button
+                                type="button"
+                                onClick={onShowTerms} // Call the function here
+                                className="text-blue-500 hover:text-blue-600 font-medium hover:underline focus:outline-none"
+                            >
+                                terms & conditions
+                            </button>
                         </p>
                     </div>
                 </div>
 
             </div>
-    </div>
-  )
+
+
+        </div>
+    )
 }
 
 export default Login
