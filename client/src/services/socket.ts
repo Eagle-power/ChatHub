@@ -51,7 +51,7 @@ export const updateDeviceActivity = (existingId?: string) => {
 export const socket: typeof Socket = io(URL, {
     autoConnect: false,
     reconnection: true,
-    auth: (cb) => {
+    auth: (cb : (data : object) => void) => {
         const token = sessionStorage.getItem("chat_token");
         // Always get a valid (possibly new) ID
         const deviceId = getDeviceId(); 

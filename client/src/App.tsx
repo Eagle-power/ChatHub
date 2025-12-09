@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { User, Message } from "./interfaces";
 import { socket, updateDeviceActivity, getDeviceId } from "./services/socket"; // Added getDeviceId import
 import Login from "./components/Login";
-import Chat from "./components/chat";
+import Chat from "./components/Chat";
 import Terms from "./components/TermAndCondition";
 
 function App() {
