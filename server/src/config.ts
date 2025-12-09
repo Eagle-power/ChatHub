@@ -7,6 +7,7 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 interface Config {
   port: number;
   jwtSecret: string;
+  clientUrl : string;
 }
 
 // Validation Logic
@@ -26,4 +27,5 @@ const getEnvVar = (name: string): string => {
 export const config: Config = {
   port: parseInt(process.env.PORT || "8080", 10), // Port can have a default
   jwtSecret: getEnvVar("SUPER_SECRET_KEY"),        // Secret MUST NOT have a default
+  clientUrl : getEnvVar("CLIENT_URL"),
 };
