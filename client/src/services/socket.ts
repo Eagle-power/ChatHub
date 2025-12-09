@@ -1,7 +1,7 @@
 import { default as io, Socket } from "socket.io-client";
 import { v4 as uuidv4 } from 'uuid'; 
 
-const URL = "http://localhost:8080";
+const URL = import.meta.env.VITE_SERVER_URL || "http://localhost:8080";
 const EXPIRY_TIME_MS = 5 * 60 * 1000; // 5 Minutes
 
 // Helper to manage the Device ID with Expiry
