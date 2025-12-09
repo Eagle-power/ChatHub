@@ -12,7 +12,10 @@ import { Message, User } from "./interfaces";
 dotenv.config();
 
 const app = express();
-app.use(cors());
+app.use(cors({
+    origin: [config.clientUrl, "http://localhost:5173"],
+    methods: ["GET", "POST"]
+}));
 
 const httpServer = createServer(app);
 
@@ -20,7 +23,7 @@ const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
     cors: {
-        origin: [config.clientUrl , "http://localhost:5173"],
+        origin: [config.clientUrl, "http://localhost:5173"],
         methods: ["GET", "POST"]
     }
 });
