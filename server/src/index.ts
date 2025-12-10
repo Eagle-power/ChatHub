@@ -43,8 +43,16 @@ const ipViolationCounts = new Map<string, number>();
 const getClientIp = (socket: any) => {
     // Check headers for proxies (like Nginx/Cloudflare) or fallback to direct connection
     const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
+
+    if(ip){
+        const ips = typeof ip === 'string' ? ip.split(',') : ip;
+        return ips[0].trim();
+    }
+
     // Handle localhost IPv6 format (::1) or mapped IPv4 (::ffff:127.0.0.1)
-    return ip === '::1' ? '127.0.0.1' : ip;
+    // return ip === '::1' ? '127.0.0.1' : ip;
+    const remoteAddress = socket.handshake.address;
+    return remoteAddress === '::1' ? '127.0.0.1' : remoteAddress;
 };
 
 // middleware definition
