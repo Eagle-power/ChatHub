@@ -62,7 +62,7 @@ io.use((socket, next) => {
     const ip = getClientIp(socket);
     if (bannedIPs.has(ip)) {
         console.log(`Blocked connection from banned IP: ${ip}`);
-        return next(new Error("You are banned from this server."));
+        return next(new Error("You violated the guidelines in result -> Your IP has been banned from this server.\n You will no longer be able to login to ChatHubSpace."));
     }
 
     const token = socket.handshake.auth.token;
