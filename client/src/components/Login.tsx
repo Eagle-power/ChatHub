@@ -48,8 +48,8 @@ const Login = ({ onLogin, onShowTerms }: LoginProps) => {
                     <div className="mx-auto w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 shadow-lg">
                         <RiMessage2Fill className="h-8 w-8 text-white" />
                     </div>
-                    <h1 className="text-3xl font-bold text-white mb-2">Welcome Back</h1>
-                    <p className="text-indigo-100">Enter your alias to join the secure space</p>
+                    <h1 className="text-3xl font-bold text-white mb-2">ChatHubSpace</h1>
+                    <p className="text-indigo-100">Enter your alias to join the chat space</p>
                 </div>
 
                 {/* Form Section */}
