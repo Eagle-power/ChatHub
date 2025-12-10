@@ -18,7 +18,7 @@ const Login = ({ onLogin, onShowTerms }: LoginProps) => {
     // Safety: If the server is dead and doesn't respond in 5 seconds, 
     // stop the loader so the user isn't stuck forever.
     useEffect(() => {
-        let timeout: NodeJS.Timeout;
+        let timeout: ReturnType<typeof setTimeout>;
         if (isLoading) {
             timeout = setTimeout(() => {
                 setIsLoading(false);
